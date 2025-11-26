@@ -132,7 +132,7 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, 
-            serverTimestamp, orderBy, setLogLevel, getDocs 
+            serverTimestamp, setLogLevel, getDocs 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- GLOBAL FIREBASE CONFIGURATION ---
@@ -281,8 +281,8 @@
             inProgressList.innerHTML = '';
             doneList.innerHTML = '';
             
-            // 1. Define the query: All tasks, sorted by creation date
-            const q = query(collection(db, TASK_COLLECTION), orderBy('createdAt', 'asc'));
+            // 1. Define the query: All tasks. Removed orderBy to prevent potential index errors.
+            const q = query(collection(db, TASK_COLLECTION));
 
             // 2. Set up real-time listener
             onSnapshot(q, (snapshot) => {
@@ -295,15 +295,22 @@
                 
                 const counts = { todo: 0, in_progress: 0, done: 0 };
 
-                tasks.forEach(task => {
-                    const taskElement = renderTask(task);
-                    counts[task.status]++;
+                // Client-side sorting by creation time to maintain order (descending for latest on top)
+                tasks.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
 
-                    if (task.status === 'todo') {
+
+                tasks.forEach(task => {
+                    // Ensure task has a valid status, defaulting to 'todo' if missing
+                    const taskWithStatus = { ...task, status: task.status || 'todo' };
+
+                    const taskElement = renderTask(taskWithStatus);
+                    counts[taskWithStatus.status]++;
+
+                    if (taskWithStatus.status === 'todo') {
                         todoList.appendChild(taskElement);
-                    } else if (task.status === 'in_progress') {
+                    } else if (taskWithStatus.status === 'in_progress') {
                         inProgressList.appendChild(taskElement);
-                    } else if (task.status === 'done') {
+                    } else if (taskWithStatus.status === 'done') {
                         doneList.appendChild(taskElement);
                     }
                 });
@@ -351,7 +358,7 @@
                     title: title,
                     description: description,
                     status: 'todo',
-                    createdAt: serverTimestamp(),
+                    createdAt: serverTimestamp(), // Use server timestamp for reliable ordering
                     assignedTo: null,
                     createdBy: currentUserId,
                 });
@@ -396,6 +403,7 @@
                 document.getElementById('taskTitle').value = '';
                 document.getElementById('taskDescription').value = '';
                 document.getElementById('taskModal').style.display = 'none';
+                document.getElementById('submitTaskButton').disabled = false; // Re-enable on completion
             }
         });
 
@@ -406,7 +414,8 @@
                 const taskId = statusBtn.getAttribute('data-id');
                 const nextStatus = statusBtn.getAttribute('data-next-status');
                 
-                // Determine current status from the button's parent column list ID
+                // Determine current status from the button's parent card's status label (less error-prone than column ID)
+                // A better approach is to read the status from the DOM if available, but for now, we infer from column ID
                 const parentListId = statusBtn.closest('.kanban-column').id;
                 let currentStatus;
                 if (parentListId.includes('todo')) currentStatus = 'todo';
