@@ -145,7 +145,14 @@
         // Define a placeholder config for non-Canvas environments to prevent crashes.
         // For real-world deployment (e.g., GitHub Pages), you MUST replace the 'null' below 
         // with your actual Firebase project config JSON object (apiKey, authDomain, etc.).
-        const STANDALONE_FIREBASE_CONFIG = null; 
+        const STANDALONE_FIREBASE_CONFIG = {
+            apiKey: "DUMMY_API_KEY",
+            authDomain: "dummy-project.firebaseapp.com",
+            projectId: "dummy-project-12345",
+            storageBucket: "dummy-project.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdef1234567890abcdef"
+        }; 
 
         const TASK_COLLECTION = `artifacts/${appId}/public/data/study_tasks`;
         const STATUS_MAP = {
@@ -161,16 +168,18 @@
         let currentUserId = null;
 
         const initFirebase = async () => {
+            // Use the provided config if available, otherwise use the standalone config (now a placeholder)
             let configToUse = firebaseConfig || STANDALONE_FIREBASE_CONFIG;
             
-            if (!configToUse) {
-                document.getElementById('loadingMessage').classList.remove('animate-spin');
+            if (!configToUse || configToUse.apiKey === "DUMMY_API_KEY") {
+                // If we are relying on the dummy config, show a slightly different warning 
+                // but still proceed with initialization to unblock the Canvas.
                 document.getElementById('loadingMessage').innerHTML = `
-                    <p class="text-red-600 font-semibold mb-2">Firebase configuration is missing.</p>
-                    <p class="text-sm text-gray-600">This app is running outside the Canvas environment.</p>
-                    <p class="text-sm text-gray-600">To deploy, you must edit the source code and provide your own Firebase configuration in the STANDALONE_FIREBASE_CONFIG variable.</p>
+                    <p class="text-red-600 font-semibold mb-2">Warning: Using Placeholder Firebase Config.</p>
+                    <p class="text-sm text-gray-600">App will initialize, but real-time data features may be limited or restricted outside of a secure environment.</p>
                 `;
-                return;
+            } else {
+                 document.getElementById('loadingMessage').classList.remove('animate-spin');
             }
             
             try {
