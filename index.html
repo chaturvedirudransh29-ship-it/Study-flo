@@ -8,8 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Lucide Icons -->
     <script type="module">
-        import { createIcons, ListChecks, PlusCircle, User, Loader2, BookOpen, Clock, CheckCircle, Trash2 } from 'https://cdn.jsdelivr.net/npm/lucide@latest/dist/esm/lucide.js';
-        window.lucide = { createIcons, icons: { ListChecks, PlusCircle, User, Loader2, BookOpen, Clock, CheckCircle, Trash2 } };
+        import { createIcons, ListChecks, PlusCircle, User, Loader2, BookOpen, Clock, CheckCircle, Trash2, Lightbulb } from 'https://cdn.jsdelivr.net/npm/lucide@latest/dist/esm/lucide.js';
+        window.lucide = { createIcons, icons: { ListChecks, PlusCircle, User, Loader2, BookOpen, Clock, CheckCircle, Trash2, Lightbulb } };
     </script>
     <style>
         /* Custom styles for better scrollability and appearance */
@@ -39,7 +39,7 @@
     <header class="max-w-7xl mx-auto mb-8">
         <div class="flex items-center justify-between border-b pb-4">
             <h1 class="text-3xl font-extrabold text-gray-900 flex items-center">
-                <i data-lucide="book-open" class="w-7 h-7 mr-3 text-indigo-500"></i>
+                <i data-lucide="lightbulb" class="w-7 h-7 mr-3 text-indigo-500"></i>
                 StudyFlow: Collaborative Task Board
             </h1>
             <button id="addTaskButton"
@@ -136,10 +136,17 @@
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- GLOBAL FIREBASE CONFIGURATION ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // NOTE: These variables are provided by the Canvas environment for secure, pre-configured access.
+        const isInCanvas = typeof __firebase_config !== 'undefined';
+        const appId = isInCanvas ? __app_id : 'standalone-app-id';
+        const firebaseConfig = isInCanvas ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = isInCanvas ? __initial_auth_token : null;
         
+        // Define a placeholder config for non-Canvas environments to prevent crashes.
+        // For real-world deployment (e.g., GitHub Pages), you MUST replace the 'null' below 
+        // with your actual Firebase project config JSON object (apiKey, authDomain, etc.).
+        const STANDALONE_FIREBASE_CONFIG = null; 
+
         const TASK_COLLECTION = `artifacts/${appId}/public/data/study_tasks`;
         const STATUS_MAP = {
             'todo': { label: 'To Do', color: 'bg-red-500', next: 'in_progress', nextLabel: 'Start Task' },
@@ -154,13 +161,20 @@
         let currentUserId = null;
 
         const initFirebase = async () => {
-            if (!firebaseConfig) {
-                document.getElementById('loadingMessage').innerHTML = 'Firebase configuration is missing.';
+            let configToUse = firebaseConfig || STANDALONE_FIREBASE_CONFIG;
+            
+            if (!configToUse) {
+                document.getElementById('loadingMessage').classList.remove('animate-spin');
+                document.getElementById('loadingMessage').innerHTML = `
+                    <p class="text-red-600 font-semibold mb-2">Firebase configuration is missing.</p>
+                    <p class="text-sm text-gray-600">This app is running outside the Canvas environment.</p>
+                    <p class="text-sm text-gray-600">To deploy, you must edit the source code and provide your own Firebase configuration in the STANDALONE_FIREBASE_CONFIG variable.</p>
+                `;
                 return;
             }
             
             try {
-                app = initializeApp(firebaseConfig);
+                app = initializeApp(configToUse);
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
